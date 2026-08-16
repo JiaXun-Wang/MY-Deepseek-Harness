@@ -247,10 +247,18 @@ function showApp(win, appUrl) {
   const hold = Math.max(0, MIN_SPLASH_MS - elapsed)
   const go = () => {
     if (win.isDestroyed()) return
-    const current = win.webContents.getURL()
-    if (current !== appUrl) win.loadURL(appUrl)
-    win.show()
-    win.focus()
+    // Fade the splash out before swapping in the app so the transition reads
+    // as a graceful dissolve, not an abrupt jump from animation to UI.
+    win.webContents
+      .executeJavaScript(`(()=>{const s=document.querySelector('.wrap');if(s)s.style.transition='opacity .35s ease';s.style.opacity='0';})()`, true)
+      .catch(() => {})
+      .finally(() => {
+        if (win.isDestroyed()) return
+        const current = win.webContents.getURL()
+        if (current !== appUrl) win.loadURL(appUrl)
+        win.show()
+        win.focus()
+      })
   }
   if (hold > 0) setTimeout(go, hold)
   else go()
