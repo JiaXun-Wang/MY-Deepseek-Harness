@@ -24,11 +24,6 @@ const DEFAULT_PORT = 5180
 const CLI_CLIENT = join(ROOT, 'apps', 'cli', 'lib', 'bin.js')
 const NODE = process.env.NODE || (process.platform === 'win32' ? 'node' : 'node')
 
-// Minimum splash duration so the startup animation is always visible even when
-// the service is already warm (a warm open used to skip it entirely).
-const MIN_SPLASH_MS = 1400
-let splashStartedAt = 0
-
 function nodeCommand() {
   // Resolve an absolute node path so the shell always launches the same runtime
   // found on PATH at startup.
@@ -152,47 +147,6 @@ function startServer(port) {
   })
 }
 
-const SPLASH_HTML = `data:text/html;charset=utf-8,${encodeURIComponent(`<!doctype html>
-<html>
-<head>
-<meta charset="utf-8">
-<style>
-  html,body{height:100%;width:100%;margin:0;background:radial-gradient(1200px 700px at 50% 40%, #1a1a1a 0%, #131312 55%, #0c0c0b 100%);color:#e8e8e6;overflow:hidden;-webkit-font-smoothing:antialiased}
-  .wrap{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:36px;opacity:0;animation:fadein .6s ease-out forwards}
-  .mark{position:relative;width:120px;height:120px;flex:0 0 auto}
-  .mark svg{position:absolute;left:0;top:0;width:120px;height:120px;transform:rotate(-90deg)}
-  .mark .halo{position:absolute;left:-26px;top:-26px;width:172px;height:172px;border-radius:50%;background:radial-gradient(circle,rgba(90,134,239,.30),transparent 68%);animation:breathe 2.4s ease-in-out infinite}
-  .mark .track{position:absolute;left:6px;top:6px;width:108px;height:108px;border-radius:50%;border:1.5px solid rgba(90,134,239,.10);box-sizing:border-box}
-  .mark .core{position:absolute;left:53px;top:53px;width:14px;height:14px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#c5dcff,#5a86ef 75%);box-shadow:0 0 22px rgba(90,134,239,.85);animation:pulse 1.6s ease-in-out infinite;z-index:2}
-  .mark .ring1{animation:spin 1.4s linear infinite}
-  .mark .ring2{animation:spin 2.1s linear infinite reverse}
-  .barwrap{width:200px;height:3px;border-radius:2px;background:rgba(255,255,255,.06);overflow:hidden;flex:0 0 auto}
-  .barwrap i{display:block;height:100%;width:38%;border-radius:2px;background:linear-gradient(90deg,#5a86ef,#b8cdff);box-shadow:0 0 14px rgba(90,134,239,.75);animation:flow 1.1s cubic-bezier(.4,0,.2,1) infinite}
-  @keyframes fadein{to{opacity:1}}
-  @keyframes spin{to{transform:rotate(270deg)}}
-  @keyframes breathe{0%,100%{opacity:.4;transform:scale(.96)}50%{opacity:.9;transform:scale(1.04)}}
-  @keyframes pulse{0%,100%{transform:scale(1);box-shadow:0 0 18px rgba(90,134,239,.55)}50%{transform:scale(1.18);box-shadow:0 0 32px rgba(90,134,239,.95)}}
-  @keyframes flow{0%{margin-left:-38%}100%{margin-left:100%}}
-</style>
-</head>
-<body>
-  <div class="wrap">
-    <div class="mark">
-      <div class="halo"></div>
-      <div class="track"></div>
-      <svg class="ring1" viewBox="0 0 120 120" fill="none">
-        <circle cx="60" cy="60" r="46" stroke="rgba(90,134,239,.55)" stroke-width="3" stroke-linecap="round" stroke-dasharray="60 230" />
-      </svg>
-      <svg class="ring2" viewBox="0 0 120 120" fill="none">
-        <circle cx="60" cy="60" r="54" stroke="rgba(120,160,255,.35)" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="22 318" />
-      </svg>
-      <div class="core"></div>
-    </div>
-    <div class="barwrap"><i></i></div>
-  </div>
-</body>
-</html>`)}`
-
 function createWindow(appOrigin) {
   const win = new BrowserWindow({
     width: 1280,
@@ -216,8 +170,7 @@ function createWindow(appOrigin) {
     return { action: 'deny' }
   })
   win.webContents.on('will-navigate', (event, target) => {
-    // Allow navigation to our own app origin (splash -> app, app-internal);
-    // block anything pointing elsewhere.
+    // Allow navigation to our own app origin (app-internal); block anywhere else.
     const allowed = target.startsWith(appOrigin)
     if (!allowed) event.preventDefault()
   })
@@ -232,36 +185,16 @@ function createWindow(appOrigin) {
     }
   })
 
-  // Show a local splash immediately; navigate to the app once the service is up.
-  splashStartedAt = Date.now()
-  win.loadURL(SPLASH_HTML)
   return win
 }
 
 /** Navigate the window to the real app URL once the service is ready. */
 function showApp(win, appUrl) {
   if (win.isDestroyed()) return
-  // Always give the splash a readable beat, even when the service is already
-  // warm (so the user sees it, not a flash that jumps straight to the app).
-  const elapsed = Date.now() - splashStartedAt
-  const hold = Math.max(0, MIN_SPLASH_MS - elapsed)
-  const go = () => {
-    if (win.isDestroyed()) return
-    // Fade the splash out before swapping in the app so the transition reads
-    // as a graceful dissolve, not an abrupt jump from animation to UI.
-    win.webContents
-      .executeJavaScript(`(()=>{const s=document.querySelector('.wrap');if(s)s.style.transition='opacity .35s ease';s.style.opacity='0';})()`, true)
-      .catch(() => {})
-      .finally(() => {
-        if (win.isDestroyed()) return
-        const current = win.webContents.getURL()
-        if (current !== appUrl) win.loadURL(appUrl)
-        win.show()
-        win.focus()
-      })
-  }
-  if (hold > 0) setTimeout(go, hold)
-  else go()
+  const current = win.webContents.getURL()
+  if (current !== appUrl) win.loadURL(appUrl)
+  win.show()
+  win.focus()
 }
 
 // System tray: keeps the app + service resident, and gives an explicit way to
