@@ -1,0 +1,10 @@
+# Standalone workspace for the desktop shell: the shell is intentionally
+# independent of the DeepSeek Harness monorepo (which has its own workspace
+# root one level up). scoped so pnpm treats this directory as its root.
+packages:
+  - "*"
+
+# pnpm 11 allow-list: permit Electron's postinstall (downloads its runtime
+# binary from the configured mirror).
+allowBuilds:
+  electron: true
