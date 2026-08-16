@@ -24,6 +24,11 @@ const DEFAULT_PORT = 5180
 const CLI_CLIENT = join(ROOT, 'apps', 'cli', 'lib', 'bin.js')
 const NODE = process.env.NODE || (process.platform === 'win32' ? 'node' : 'node')
 
+// Minimum splash duration so the startup animation is always visible even when
+// the service is already warm (a warm open used to skip it entirely).
+const MIN_SPLASH_MS = 1400
+let splashStartedAt = 0
+
 function nodeCommand() {
   // Resolve an absolute node path so the shell always launches the same runtime
   // found on PATH at startup.
@@ -220,6 +225,7 @@ function createWindow(appOrigin) {
   })
 
   // Show a local splash immediately; navigate to the app once the service is up.
+  splashStartedAt = Date.now()
   win.loadURL(SPLASH_HTML)
   return win
 }
@@ -227,10 +233,19 @@ function createWindow(appOrigin) {
 /** Navigate the window to the real app URL once the service is ready. */
 function showApp(win, appUrl) {
   if (win.isDestroyed()) return
-  const current = win.webContents.getURL()
-  if (current !== appUrl) win.loadURL(appUrl)
-  win.show()
-  win.focus()
+  // Always give the splash a readable beat, even when the service is already
+  // warm (so the user sees it, not a flash that jumps straight to the app).
+  const elapsed = Date.now() - splashStartedAt
+  const hold = Math.max(0, MIN_SPLASH_MS - elapsed)
+  const go = () => {
+    if (win.isDestroyed()) return
+    const current = win.webContents.getURL()
+    if (current !== appUrl) win.loadURL(appUrl)
+    win.show()
+    win.focus()
+  }
+  if (hold > 0) setTimeout(go, hold)
+  else go()
 }
 
 // System tray: keeps the app + service resident, and gives an explicit way to
