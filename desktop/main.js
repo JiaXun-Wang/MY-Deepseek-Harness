@@ -147,7 +147,37 @@ function startServer(port) {
   })
 }
 
-const SPLASH_HTML = `data:text/html;charset=utf-8,${encodeURIComponent(`<!doctype html><html><head><meta charset="utf-8"><style>html,body{height:100%;margin:0;background:#131312;color:#e8e8e6;font:14px system-ui,-apple-system,'Segoe UI',sans-serif;display:flex;align-items:center;justify-content:center}</style></head><body><div>正在启动 DeepSeek Harness…</div></body></html>`)}`
+const SPLASH_HTML = `data:text/html;charset=utf-8,${encodeURIComponent(`<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  html,body{height:100%;margin:0;background:radial-gradient(1200px 700px at 50% 40%, #1a1a1a 0%, #131312 55%, #0f0f0e 100%);color:#e8e8e6;font:14px system-ui,-apple-system,'Segoe UI',sans-serif;overflow:hidden;-webkit-font-smoothing:antialiased}
+  .wrap{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:26px}
+  .logo{position:relative;width:72px;height:72px}
+  .logo .ring{position:absolute;inset:0;border:7px solid rgba(90,134,239,.18);border-top-color:#5a86ef;border-right-color:#86a8f5;border-radius:50%;animation:spin 1.9s cubic-bezier(.45,.05,.45,.95) infinite}
+  .logo .core{position:absolute;left:50%;top:50%;width:16px;height:16px;margin:-8px 0 0 -8px;border-radius:50%;background:#5a86ef;box-shadow:0 0 18px rgba(90,134,239,.7);animation:breathe 1.9s ease-in-out infinite}
+  .logo .glow{position:absolute;inset:-14px;border-radius:50%;background:radial-gradient(circle,rgba(90,134,239,.22),transparent 68%);animation:fade 2.4s ease-in-out infinite}
+  h1{margin:0;font-size:20px;font-weight:600;letter-spacing:.4px;background:linear-gradient(180deg,#ffffff 20%,#b9c6ee 90%);-webkit-background-clip:text;background-clip:text;color:transparent;animation:rise .8s ease-out both}
+  .status{margin:0;font-size:12.5px;color:#6f7686;letter-spacing:.3px;animation:rise .9s ease-out .1s both}
+  .bar{width:170px;height:3px;border-radius:2px;background:rgba(255,255,255,.06);overflow:hidden;animation:rise 1s ease-out .15s both}
+  .bar i{display:block;height:100%;width:42%;border-radius:2px;background:linear-gradient(90deg,#5a86ef,#86a8f5);box-shadow:0 0 10px rgba(90,134,239,.6);animation:flow 1.3s ease-in-out infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  @keyframes breathe{0%,100%{transform:scale(1);opacity:.9}50%{transform:scale(1.12);opacity:1}}
+  @keyframes fade{0%,100%{opacity:.5}50%{opacity:1}}
+  @keyframes flow{0%{margin-left:-42%}100%{margin-left:100%}}
+  @keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="logo"><div class="glow"></div><div class="ring"></div><div class="core"></div></div>
+    <h1>DeepSeek Harness</h1>
+    <p class="status">正在启动本地服务…</p>
+    <div class="bar"><i></i></div>
+  </div>
+</body>
+</html>`)}`
 
 function createWindow(appOrigin) {
   const win = new BrowserWindow({
