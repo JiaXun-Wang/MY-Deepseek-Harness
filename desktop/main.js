@@ -157,16 +157,16 @@ const SPLASH_HTML = `data:text/html;charset=utf-8,${encodeURIComponent(`<!doctyp
 <head>
 <meta charset="utf-8">
 <style>
-  html,body{height:100%;margin:0;background:radial-gradient(1200px 700px at 50% 40%, #1a1a1a 0%, #131312 55%, #0c0c0b 100%);color:#e8e8e6;overflow:hidden;-webkit-font-smoothing:antialiased}
-  .wrap{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:36px;opacity:0;animation:fadein .6s ease-out forwards}
-  .mark{position:relative;width:120px;height:120px;display:grid;place-items:center}
-  .mark svg{position:absolute;inset:0;width:100%;height:100%;transform:rotate(-90deg)}
-  .mark .halo{position:absolute;inset:-26px;border-radius:50%;background:radial-gradient(circle,rgba(90,134,239,.30),transparent 68%);animation:breathe 2.4s ease-in-out infinite}
-  .mark .track{position:absolute;inset:6px;border-radius:50%;border:1.5px solid rgba(90,134,239,.10)}
-  .mark .core{width:14px;height:14px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#c5dcff,#5a86ef 75%);box-shadow:0 0 22px rgba(90,134,239,.85);animation:pulse 1.6s ease-in-out infinite;z-index:2}
+  html,body{height:100%;width:100%;margin:0;background:radial-gradient(1200px 700px at 50% 40%, #1a1a1a 0%, #131312 55%, #0c0c0b 100%);color:#e8e8e6;overflow:hidden;-webkit-font-smoothing:antialiased}
+  .wrap{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:36px;opacity:0;animation:fadein .6s ease-out forwards}
+  .mark{position:relative;width:120px;height:120px;flex:0 0 auto}
+  .mark svg{position:absolute;left:0;top:0;width:120px;height:120px;transform:rotate(-90deg)}
+  .mark .halo{position:absolute;left:-26px;top:-26px;width:172px;height:172px;border-radius:50%;background:radial-gradient(circle,rgba(90,134,239,.30),transparent 68%);animation:breathe 2.4s ease-in-out infinite}
+  .mark .track{position:absolute;left:6px;top:6px;width:108px;height:108px;border-radius:50%;border:1.5px solid rgba(90,134,239,.10);box-sizing:border-box}
+  .mark .core{position:absolute;left:53px;top:53px;width:14px;height:14px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#c5dcff,#5a86ef 75%);box-shadow:0 0 22px rgba(90,134,239,.85);animation:pulse 1.6s ease-in-out infinite;z-index:2}
   .mark .ring1{animation:spin 1.4s linear infinite}
   .mark .ring2{animation:spin 2.1s linear infinite reverse}
-  .barwrap{width:200px;height:3px;border-radius:2px;background:rgba(255,255,255,.06);overflow:hidden}
+  .barwrap{width:200px;height:3px;border-radius:2px;background:rgba(255,255,255,.06);overflow:hidden;flex:0 0 auto}
   .barwrap i{display:block;height:100%;width:38%;border-radius:2px;background:linear-gradient(90deg,#5a86ef,#b8cdff);box-shadow:0 0 14px rgba(90,134,239,.75);animation:flow 1.1s cubic-bezier(.4,0,.2,1) infinite}
   @keyframes fadein{to{opacity:1}}
   @keyframes spin{to{transform:rotate(270deg)}}
