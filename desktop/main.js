@@ -157,23 +157,37 @@ const SPLASH_HTML = `data:text/html;charset=utf-8,${encodeURIComponent(`<!doctyp
 <head>
 <meta charset="utf-8">
 <style>
-  html,body{height:100%;margin:0;background:radial-gradient(1200px 700px at 50% 40%, #1a1a1a 0%, #131312 55%, #0f0f0e 100%);color:#e8e8e6;overflow:hidden;-webkit-font-smoothing:antialiased}
-  .wrap{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:34px}
-  .logo{position:relative;width:84px;height:84px}
-  .logo .halo{position:absolute;inset:-22px;border-radius:50%;background:radial-gradient(circle,rgba(90,134,239,.32),transparent 68%);animation:breathe 2.2s ease-in-out infinite}
-  .logo .ring{position:absolute;inset:0;border:8px solid rgba(90,134,239,.16);border-left-color:#5a86ef;border-top-color:#8db1ff;border-radius:50%;animation:spin 1.5s cubic-bezier(.45,.05,.5,.95) infinite}
-  .logo .inner{position:absolute;left:50%;top:50%;width:20px;height:20px;margin:-10px 0 0 -10px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#a8c4ff,#5a86ef 70%);box-shadow:0 0 26px rgba(90,134,239,.85);animation:pulse 1.5s ease-in-out infinite}
-  .barwrap{width:180px;height:3px;border-radius:2px;background:rgba(255,255,255,.06);overflow:hidden}
-  .barwrap i{display:block;height:100%;width:44%;border-radius:2px;background:linear-gradient(90deg,#5a86ef,#9db8ff);box-shadow:0 0 12px rgba(90,134,239,.7);animation:flow 1.2s ease-in-out infinite}
-  @keyframes spin{to{transform:rotate(360deg)}}
-  @keyframes breathe{0%,100%{opacity:.45;transform:scale(.96)}50%{opacity:.9;transform:scale(1.05)}}
-  @keyframes pulse{0%,100%{transform:scale(1);box-shadow:0 0 20px rgba(90,134,239,.6)}50%{transform:scale(1.16);box-shadow:0 0 34px rgba(90,134,239,.95)}}
-  @keyframes flow{0%{margin-left:-44%}100%{margin-left:100%}}
+  html,body{height:100%;margin:0;background:radial-gradient(1200px 700px at 50% 40%, #1a1a1a 0%, #131312 55%, #0c0c0b 100%);color:#e8e8e6;overflow:hidden;-webkit-font-smoothing:antialiased}
+  .wrap{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:36px;opacity:0;animation:fadein .6s ease-out forwards}
+  .mark{position:relative;width:120px;height:120px;display:grid;place-items:center}
+  .mark svg{position:absolute;inset:0;width:100%;height:100%;transform:rotate(-90deg)}
+  .mark .halo{position:absolute;inset:-26px;border-radius:50%;background:radial-gradient(circle,rgba(90,134,239,.30),transparent 68%);animation:breathe 2.4s ease-in-out infinite}
+  .mark .track{position:absolute;inset:6px;border-radius:50%;border:1.5px solid rgba(90,134,239,.10)}
+  .mark .core{width:14px;height:14px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#c5dcff,#5a86ef 75%);box-shadow:0 0 22px rgba(90,134,239,.85);animation:pulse 1.6s ease-in-out infinite;z-index:2}
+  .mark .ring1{animation:spin 1.4s linear infinite}
+  .mark .ring2{animation:spin 2.1s linear infinite reverse}
+  .barwrap{width:200px;height:3px;border-radius:2px;background:rgba(255,255,255,.06);overflow:hidden}
+  .barwrap i{display:block;height:100%;width:38%;border-radius:2px;background:linear-gradient(90deg,#5a86ef,#b8cdff);box-shadow:0 0 14px rgba(90,134,239,.75);animation:flow 1.1s cubic-bezier(.4,0,.2,1) infinite}
+  @keyframes fadein{to{opacity:1}}
+  @keyframes spin{to{transform:rotate(270deg)}}
+  @keyframes breathe{0%,100%{opacity:.4;transform:scale(.96)}50%{opacity:.9;transform:scale(1.04)}}
+  @keyframes pulse{0%,100%{transform:scale(1);box-shadow:0 0 18px rgba(90,134,239,.55)}50%{transform:scale(1.18);box-shadow:0 0 32px rgba(90,134,239,.95)}}
+  @keyframes flow{0%{margin-left:-38%}100%{margin-left:100%}}
 </style>
 </head>
 <body>
   <div class="wrap">
-    <div class="logo"><div class="halo"></div><div class="ring"></div><div class="inner"></div></div>
+    <div class="mark">
+      <div class="halo"></div>
+      <div class="track"></div>
+      <svg class="ring1" viewBox="0 0 120 120" fill="none">
+        <circle cx="60" cy="60" r="46" stroke="rgba(90,134,239,.55)" stroke-width="3" stroke-linecap="round" stroke-dasharray="60 230" />
+      </svg>
+      <svg class="ring2" viewBox="0 0 120 120" fill="none">
+        <circle cx="60" cy="60" r="54" stroke="rgba(120,160,255,.35)" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="22 318" />
+      </svg>
+      <div class="core"></div>
+    </div>
     <div class="barwrap"><i></i></div>
   </div>
 </body>
