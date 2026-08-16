@@ -202,7 +202,6 @@ function createWindow(appOrigin) {
     title: 'DeepSeek Harness',
     backgroundColor: '#131312',
     autoHideMenuBar: true,
-    useContentSize: true,
     webPreferences: {
       preload: join(__dirname, 'preload.js'),
       contextIsolation: true,
