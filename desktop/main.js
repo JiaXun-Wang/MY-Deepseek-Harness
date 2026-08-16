@@ -154,7 +154,9 @@ function createWindow(appOrigin) {
     minWidth: 900,
     minHeight: 600,
     title: 'DeepSeek Harness',
-    backgroundColor: '#131312',
+    // Match the AppRoot loading page background so there's no dark flash
+    // between window creation and the HARNESS loader rendering.
+    backgroundColor: '#f9fafb',
     autoHideMenuBar: true,
     webPreferences: {
       preload: join(__dirname, 'preload.js'),
