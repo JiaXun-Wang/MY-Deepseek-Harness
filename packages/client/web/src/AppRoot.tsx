@@ -36,24 +36,22 @@ export function AppRoot(props: AppRootProps) {
 
   const loud = error !== undefined || failed.length > 0
 
+  // While plugins load, render only the theme background — no card, no
+  // wordmark, no spinner, no "Loading plugins…" hint. The packaged desktop
+  // shell renders its own icon-only splash on top of this background during
+  // the same window; any second loading surface would just look like a
+  // leftover from the older "DeepSeek Harness…" text page.
+  if (!loud) return <div className={css.boot} />
+
   return (
     <div className={css.boot}>
       <div className={css.card}>
         <div className={css.wordmark}>HARNESS</div>
-        {!loud
-          ? (
-            <>
-              <div className={css.spinner} />
-              <div className={css.hint}>Loading plugins…</div>
-            </>
-          )
-          : (
-            <div className={css.failed}>
-              <div className={css.failedTitle}>Failed to load plugins</div>
-              {failed.map(([id]) => <div key={id} className={css.failedItem}>{id}</div>)}
-              {error !== undefined && <div className={css.failedItem}>{error}</div>}
-            </div>
-          )}
+        <div className={css.failed}>
+          <div className={css.failedTitle}>Failed to load plugins</div>
+          {failed.map(([id]) => <div key={id} className={css.failedItem}>{id}</div>)}
+          {error !== undefined && <div className={css.failedItem}>{error}</div>}
+        </div>
       </div>
     </div>
   )
