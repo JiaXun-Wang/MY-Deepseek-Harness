@@ -19,8 +19,10 @@ pnpm --dir desktop start
 
 ## 行为
 
-- 默认在 `127.0.0.1:3080` 启动 `dsh web` 服务；若 3080 已被另一个 Harness 实例占用且健康，
-  直接复用并打开。
+- 在**专属端口 `5180`** 启动这个 DeepSeek Harness 自己的 `dsh web` 服务
+  （不占用网页版惯用的 `3080`，以免与本机其他 Harness/页面实例冲突；可用环境变量 `DSH_DESKTOP_PORT` 覆盖）。
+- 只有当端口上**已经是真实的 Harness 界面**（返回含 `#root` / Harness 标题）时才复用；
+  若被无关 Web 程序占用或为空，则自动新起自己的服务（必要时改用系统空闲端口）。
 - 窗口关闭时停止本次启动的服务进程并退出进程树。
 - 渲染进程 `sandbox + contextIsolation` 开启，`nodeIntegration` 关闭，只做桌面框查看，不注入特权 API。
 - 外部 `https?` 链接用系统默认浏览器打开（`setWindowOpenHandler` 拦截 + `shell.openExternal`）。
