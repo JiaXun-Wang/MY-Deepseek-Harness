@@ -11,9 +11,22 @@
 - [Node.js](https://nodejs.org) `^22.19.0 || >=24.0.0`
 - [pnpm](https://pnpm.io) `11.x`
 
-## 一键启动
+## 桌面应用（推荐）
 
-双击桌面快捷方式 **「DeepSeek Harness Web」**（对应本目录 `start-dsh-web.ps1`）：
+双击桌面 **「DeepSeek Harness」** 快捷方式即可打开**独立桌面窗口**应用
+（不再占用浏览器标签页，有自己的图标/标题栏/任务栏，观感接近原生软件）：
+
+- 壳实现在 `desktop/`（Electron），负责拉起本地 `dsh web` 服务并开一个窗口加载 `127.0.0.1:3080`。
+- 窗口关闭即停止本次启动的服务进程。
+- 若 3080 已被另一个 Harness 实例占用且健康，会直接复用并打开。
+- 首次手动启动：`pnpm --dir desktop install` 后 `pnpm --dir desktop start`。
+- 已安装好的桌面壳：`desktop\node_modules\electron\dist\electron.exe`（工作目录 `desktop`）。
+
+> 换 Tauri 优化壳（更轻量）时无需改 `dsh web` 核心：壳只做「起服务 + 开窗口」，源码在 `desktop/main.js`。
+
+## 浏览器方式（备选）
+
+也可用浏览器访问 `start-dsh-web.ps1`（双击 **「DeepSeek Harness Web」** 快捷方式）：
 
 1. 启动本地服务（默认 `http://127.0.0.1:3080`）。
 2. 服务就绪后自动在浏览器打开界面。
