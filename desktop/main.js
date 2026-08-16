@@ -38,6 +38,28 @@ function testUrl(url, timeoutMs = 3500) {
   })
 }
 
+// True Harness detection: a plain HTTP 200 is not enough — only reuse a port
+// when the served page is actually the DeepSeek Harness shell (#root + title),
+// so an unrelated web app squatting on 3080 never gets loaded by mistake.
+function getBody(url, timeoutMs = 5000) {
+  return new Promise((resolvePromise) => {
+    const req = http.get(url, (res) => {
+      let data = ''
+      res.setEncoding('utf8')
+      res.on('data', (c) => { data += c })
+      res.on('end', () => resolvePromise(data))
+    })
+    req.setTimeout(timeoutMs, () => { req.destroy(); resolvePromise('') })
+    req.on('error', () => resolvePromise(''))
+  })
+}
+
+async function isHarnessOnPort(port) {
+  const body = await getBody(`http://127.0.0.1:${port}/`)
+  if (!body) return false
+  return body.includes('id="root"') || /<title>\s*DeepSeek Harness/.test(body)
+}
+
 async function isPortUp(port) {
   return testUrl(`http://127.0.0.1:${port}`)
 }
@@ -53,17 +75,21 @@ function stopServer() {
 }
 
 // Start the dsh web server, produce the URL it serves, and resolve with it.
-// Reuses a healthy server already on the default port.
+// Only reuses a port when it already serves the actual Harness shell.
 function startServer(port) {
   return new Promise((resolvePromise, rejectPromise) => {
-    // Already a healthy service on the default port -> reuse.
     if (port === DEFAULT_PORT) {
-      isPortUp(port).then((up) => {
-        if (up) {
+      isHarnessOnPort(port).then((isHarness) => {
+        if (isHarness) {
+          // A real Harness instance is already there — reuse it.
           resolvePromise({ url: `http://127.0.0.1:${port}`, child: null })
           return
         }
-        launch(port)
+        // Port is taken by something that is not Harness -> let the OS pick a
+        // free port for our own instance (binding the taken one would EADDRINUSE).
+        isPortUp(port).then((busy) => {
+          launch(busy ? 0 : port)
+        })
       })
     } else {
       launch(port)
