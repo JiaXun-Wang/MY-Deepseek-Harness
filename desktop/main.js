@@ -9,7 +9,7 @@
 //   4. No Node/IPC is exposed to the page (contextIsolation + sandbox); the
 //      window is purely a desktop-frame viewer for the existing web client.
 
-const { app, BrowserWindow, shell, Tray, Menu, nativeImage } = require('electron')
+const { app, BrowserWindow, shell, Tray, Menu, nativeImage, ipcMain } = require('electron')
 const { spawn } = require('node:child_process')
 const { join, resolve } = require('node:path')
 const http = require('node:http')
@@ -172,6 +172,26 @@ function createWindow(url) {
     const allowed = target.startsWith(url)
     if (!allowed) event.preventDefault()
   })
+  // Inject a visible floating "Stop service" button into the page so the
+  // user can turn the background service off without hunting for the tray.
+  win.webContents.on('did-finish-load', () => {
+    win.webContents.executeJavaScript(`(() => {
+      if (window.__dshStopBtnAdded) return
+      const btn = document.createElement('div')
+      btn.textContent = '停止服务并退出'
+      Object.assign(btn.style, {
+        position: 'fixed', right: '16px', bottom: '16px', zIndex: '2147483647',
+        background: 'rgba(240,90,90,0.92)', color: '#fff', font: '12px/1 sans-serif',
+        padding: '8px 12px', borderRadius: '8px', cursor: 'pointer',
+        boxShadow: '0 2px 8px rgba(0,0,0,.35)', userSelect: 'none',
+      })
+      btn.title = '停止后台 dsh 服务并退出桌面端'
+      btn.onclick = () => { window.desktopShell && window.desktopShell.stopService() }
+      ;(document.body || document.documentElement).appendChild(btn)
+      window.__dshStopBtnAdded = true
+    })()`).catch(() => {})
+  })
+
   // Closing the window keeps the app (and its dsh web service on 5180) alive
   // in the system tray so the browser can keep syncing. The service is only
   // stopped by explicitly quitting/stopping from the tray.
@@ -251,4 +271,12 @@ app.on('window-all-closed', (event) => {
 app.on('before-quit', () => {
   isQuitting = true
   stopServer()
+})
+
+// Handles the in-page "Stop service and quit" request (floating button /
+// settings affordance) plus the tray's same action.
+ipcMain.on('desktop:stop-service', () => {
+  isQuitting = true
+  stopServer()
+  app.quit()
 })
