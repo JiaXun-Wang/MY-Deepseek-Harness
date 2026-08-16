@@ -31,7 +31,7 @@ function nodeCommand() {
   return cmd
 }
 
-function testUrl(url, timeoutMs = 3500) {
+function testUrl(url, timeoutMs = 700) {
   return new Promise((resolvePromise) => {
     const req = http.get(url, (res) => {
       res.resume()
@@ -45,7 +45,7 @@ function testUrl(url, timeoutMs = 3500) {
 // True Harness detection: a plain HTTP 200 is not enough — only reuse a port
 // when the served page is actually the DeepSeek Harness shell (#root + title),
 // so an unrelated web app squatting on 3080 never gets loaded by mistake.
-function getBody(url, timeoutMs = 5000) {
+function getBody(url, timeoutMs = 800) {
   return new Promise((resolvePromise) => {
     const req = http.get(url, (res) => {
       let data = ''
@@ -83,18 +83,21 @@ function stopServer() {
 function startServer(port) {
   return new Promise((resolvePromise, rejectPromise) => {
     if (port === DEFAULT_PORT) {
-      isHarnessOnPort(port).then((isHarness) => {
-        if (isHarness) {
-          // A real Harness instance is already there — reuse it.
-          resolvePromise({ url: `http://127.0.0.1:${port}`, child: null })
-          return
-        }
-        // Port is taken by something that is not Harness -> let the OS pick a
-        // free port for our own instance (binding the taken one would EADDRINUSE).
-        isPortUp(port).then((busy) => {
-          launch(busy ? 0 : port)
+      // Probe in parallel and bail fast: on an idle port both checks settle
+      // immediately (connection refused), so we spend almost no time before
+      // spawning our own instance.
+      Promise.all([isHarnessOnPort(port), isPortUp(port)])
+        .then(([isHarness, up]) => {
+          if (isHarness) {
+            // A real Harness instance is already there — reuse it.
+            resolvePromise({ url: `http://127.0.0.1:${port}`, child: null })
+            return
+          }
+          // Port taken by something that is not Harness -> let the OS pick a
+          // free port (binding a taken one would EADDRINUSE).
+          launch(up ? 0 : port)
         })
-      })
+        .catch(() => launch(port))
     } else {
       launch(port)
     }
@@ -144,7 +147,9 @@ function startServer(port) {
   })
 }
 
-function createWindow(url) {
+const SPLASH_HTML = `data:text/html;charset=utf-8,${encodeURIComponent(`<!doctype html><html><head><meta charset="utf-8"><style>html,body{height:100%;margin:0;background:#131312;color:#e8e8e6;font:14px system-ui,-apple-system,'Segoe UI',sans-serif;display:flex;align-items:center;justify-content:center}</style></head><body><div>正在启动 DeepSeek Harness…</div></body></html>`)}`
+
+function createWindow(appOrigin) {
   const win = new BrowserWindow({
     width: 1280,
     height: 840,
@@ -168,8 +173,9 @@ function createWindow(url) {
     return { action: 'deny' }
   })
   win.webContents.on('will-navigate', (event, target) => {
-    // Keep navigation inside the app origin.
-    const allowed = target.startsWith(url)
+    // Allow navigation to our own app origin (splash -> app, app-internal);
+    // block anything pointing elsewhere.
+    const allowed = target.startsWith(appOrigin)
     if (!allowed) event.preventDefault()
   })
 
@@ -182,8 +188,19 @@ function createWindow(url) {
       win.hide()
     }
   })
-  win.loadURL(url)
+
+  // Show a local splash immediately; navigate to the app once the service is up.
+  win.loadURL(SPLASH_HTML)
   return win
+}
+
+/** Navigate the window to the real app URL once the service is ready. */
+function showApp(win, appUrl) {
+  if (win.isDestroyed()) return
+  const current = win.webContents.getURL()
+  if (current !== appUrl) win.loadURL(appUrl)
+  win.show()
+  win.focus()
 }
 
 // System tray: keeps the app + service resident, and gives an explicit way to
@@ -226,9 +243,18 @@ function TrayIcon() {
 
 async function main() {
   const port = Number(process.env.DSH_DESKTOP_PORT) || DEFAULT_PORT
-  const { url } = await startServer(port)
-  mainWindow = createWindow(url)
+  const appUrl = `http://127.0.0.1:${port}`
+  // Show the splash window + tray immediately; the local app splash leaves
+  // nothing to wait on, so the user sees the window open right away.
+  mainWindow = createWindow(appUrl)
   buildTray()
+  try {
+    const { url } = await startServer(port)
+    showApp(mainWindow, url)
+  } catch (err) {
+    console.error('[desktop] failed to start dsh web:', err)
+    app.quit()
+  }
 }
 
 app.whenReady().then(() => {
