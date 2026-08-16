@@ -249,25 +249,27 @@ async function main() {
   const appUrl = `http://127.0.0.1:${port}`
   const atLogin = app.getLoginItemSettings().wasOpenedAtLogin
 
-  // Start the service first so it warms up regardless of how we were launched.
-  const serverPromise = startServer(port).catch((err) => {
-    console.error('[desktop] failed to start dsh web:', err)
-    app.quit()
-    return null
-  })
-
   if (atLogin) {
     // Autostart: warm the service silently into the tray, no window.
     buildTray()
-    await serverPromise
+    try { await startServer(port) } catch (err) {
+      console.error('[desktop] failed to start dsh web:', err)
+      app.quit()
+    }
     return
   }
 
-  // Normal launch: show splash + tray at once, swap to the app on ready.
-  mainWindow = createWindow(appUrl)
-  buildTray()
-  const result = await serverPromise
-  if (result && !mainWindow.isDestroyed()) showApp(mainWindow, result.url)
+  // Normal launch: wait for the service, then open the window directly on the
+  // app URL. The window appears once the service is ready; no local splash.
+  try {
+    const { url } = await startServer(port)
+    mainWindow = createWindow(appUrl)
+    buildTray()
+    showApp(mainWindow, url)
+  } catch (err) {
+    console.error('[desktop] failed to start dsh web:', err)
+    app.quit()
+  }
 }
 
 app.whenReady().then(() => {
