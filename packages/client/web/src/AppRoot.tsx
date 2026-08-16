@@ -1,5 +1,5 @@
 /**
- * Shell root: boot loading page → (boot settled) → fade out → real UI.
+ * Shell root: boot loading page → (boot settled) → real UI in one switch.
  * Pure kernel component with zero plugin dependencies — before settled it may
  * only rely on itself (the fail-loud presentation must not depend on the
  * system whose failure it reports; the status/signal stores are kernel-own,
@@ -8,7 +8,6 @@
  * loading page, lists the per-entry fiber states and the sweep report (fail
  * loud, no partial UI).
  */
-import { useEffect, useState } from 'react'
 import { useSyncExternalStore } from 'react'
 import type { ReactNode } from 'react'
 import type { KernelSignal, LoaderStatus } from './loader-status.ts'
@@ -33,26 +32,12 @@ export function AppRoot(props: AppRootProps) {
   const error = useSyncExternalStore(props.error.subscribe, props.error.getSnapshot)
   const failed = Object.entries(status).filter(([, s]) => s === 'failed')
 
-  // After settled, hold the loading page one frame and fade it out before
-  // swapping in the real UI. This avoids a hard light-to-dark color jump
-  // (the loader is light, the app is dark).
-  const [fadingOut, setFadingOut] = useState(false)
-  const [showApp, setShowApp] = useState(false)
-  useEffect(() => {
-    if (settled && !fadingOut && !showApp) {
-      setFadingOut(true)
-      const id = setTimeout(() => setShowApp(true), 260)
-      return () => clearTimeout(id)
-    }
-    return undefined
-  }, [settled, fadingOut, showApp])
-
-  if (showApp) return <>{props.renderApp()}</>
+  if (settled) return <>{props.renderApp()}</>
 
   const loud = error !== undefined || failed.length > 0
 
   return (
-    <div className={css.boot} style={fadingOut ? { opacity: 0, transition: 'opacity .25s ease' } : undefined}>
+    <div className={css.boot}>
       <div className={css.card}>
         <div className={css.wordmark}>HARNESS</div>
         {!loud
