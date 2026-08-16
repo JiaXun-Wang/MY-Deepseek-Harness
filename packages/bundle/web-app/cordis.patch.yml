@@ -253,6 +253,11 @@
     - id: ui-permission
       name: '@deepseek-ai/dsh-client-ui-permission-presets'
 
+    # Desktop shell row in General settings: "stop service & quit", only shown
+    # inside the packaged desktop app (where window.desktopShell exists).
+    - id: ui-desktop-shell
+      name: '@deepseek-ai/dsh-client-ui-desktop-shell'
+
     # The agent-preset row in General settings: the default preset for
     # sessions created later. Absent a roster it renders nothing.
     - id: ui-agent-preset
