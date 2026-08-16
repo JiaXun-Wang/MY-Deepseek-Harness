@@ -219,6 +219,15 @@ function buildTray() {
     { label: '浏览器打开 5180', click: () => shell.openExternal(`http://127.0.0.1:${DEFAULT_PORT}`) },
     { type: 'separator' },
     {
+      label: '开机自启（后台预热服务）',
+      type: 'checkbox',
+      checked: app.getLoginItemSettings().openAtLogin,
+      click: (item) => {
+        app.setLoginItemSettings({ openAtLogin: item.checked })
+      },
+    },
+    { type: 'separator' },
+    {
       label: '停止服务并退出',
       click: () => {
         isQuitting = true
@@ -244,17 +253,27 @@ function TrayIcon() {
 async function main() {
   const port = Number(process.env.DSH_DESKTOP_PORT) || DEFAULT_PORT
   const appUrl = `http://127.0.0.1:${port}`
-  // Show the splash window + tray immediately; the local app splash leaves
-  // nothing to wait on, so the user sees the window open right away.
-  mainWindow = createWindow(appUrl)
-  buildTray()
-  try {
-    const { url } = await startServer(port)
-    showApp(mainWindow, url)
-  } catch (err) {
+  const atLogin = app.getLoginItemSettings().wasOpenedAtLogin
+
+  // Start the service first so it warms up regardless of how we were launched.
+  const serverPromise = startServer(port).catch((err) => {
     console.error('[desktop] failed to start dsh web:', err)
     app.quit()
+    return null
+  })
+
+  if (atLogin) {
+    // Autostart: warm the service silently into the tray, no window.
+    buildTray()
+    await serverPromise
+    return
   }
+
+  // Normal launch: show splash + tray at once, swap to the app on ready.
+  mainWindow = createWindow(appUrl)
+  buildTray()
+  const result = await serverPromise
+  if (result && !mainWindow.isDestroyed()) showApp(mainWindow, result.url)
 }
 
 app.whenReady().then(() => {
