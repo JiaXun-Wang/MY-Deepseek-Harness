@@ -16,7 +16,11 @@ const http = require('node:http')
 const { existsSync } = require('node:fs')
 
 const ROOT = resolve(__dirname, '..')
-const DEFAULT_PORT = 3080
+// Dedicated default port for THIS DeepSeek Harness install. 3080 is the DSH
+// convention but other processes/environments may already use it; a dedicated
+// port guarantees "double-click -> my own DSH instance" without squatting on
+// someone else's 3080. You can still override with DSH_DESKTOP_PORT.
+const DEFAULT_PORT = 5180
 const CLI_CLIENT = join(ROOT, 'apps', 'cli', 'lib', 'bin.js')
 const NODE = process.env.NODE || (process.platform === 'win32' ? 'node' : 'node')
 
