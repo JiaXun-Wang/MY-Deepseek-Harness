@@ -9,7 +9,7 @@
 //   4. No Node/IPC is exposed to the page (contextIsolation + sandbox); the
 //      window is purely a desktop-frame viewer for the existing web client.
 
-const { app, BrowserWindow, shell } = require('electron')
+const { app, BrowserWindow, shell, Tray, Menu, nativeImage } = require('electron')
 const { spawn } = require('node:child_process')
 const { join, resolve } = require('node:path')
 const http = require('node:http')
@@ -172,15 +172,62 @@ function createWindow(url) {
     const allowed = target.startsWith(url)
     if (!allowed) event.preventDefault()
   })
-  win.on('close', () => stopServer())
+  // Closing the window keeps the app (and its dsh web service on 5180) alive
+  // in the system tray so the browser can keep syncing. The service is only
+  // stopped by explicitly quitting/stopping from the tray.
+  win.on('close', (event) => {
+    if (!isQuitting) {
+      event.preventDefault()
+      win.hide()
+    }
+  })
   win.loadURL(url)
   return win
+}
+
+// System tray: keeps the app + service resident, and gives an explicit way to
+// STOP the service (quit). This is the "turn off the service" control.
+let tray = null
+let mainWindow = null
+let isQuitting = false
+
+function buildTray() {
+  if (tray) return
+  const icon = TrayIcon()
+  tray = new Tray(icon)
+  tray.setToolTip('DeepSeek Harness')
+  const menu = Menu.buildFromTemplate([
+    { label: '打开窗口', click: () => { mainWindow?.show(); mainWindow?.focus() } },
+    { label: '浏览器打开 5180', click: () => shell.openExternal(`http://127.0.0.1:${DEFAULT_PORT}`) },
+    { type: 'separator' },
+    {
+      label: '停止服务并退出',
+      click: () => {
+        isQuitting = true
+        stopServer()
+        app.quit()
+      },
+    },
+  ])
+  tray.setContextMenu(menu)
+  tray.on('click', () => { mainWindow?.show(); mainWindow?.focus() })
+}
+
+function TrayIcon() {
+  // Prefer a bundled app icon; fall back to a small generated glyph.
+  const png = join(__dirname, 'app-icon.png')
+  if (existsSync(png)) {
+    const img = nativeImage.createFromPath(png)
+    if (!img.isEmpty()) return img.resize({ width: 16, height: 16 })
+  }
+  return nativeImage.createEmpty()
 }
 
 async function main() {
   const port = Number(process.env.DSH_DESKTOP_PORT) || DEFAULT_PORT
   const { url } = await startServer(port)
-  createWindow(url)
+  mainWindow = createWindow(url)
+  buildTray()
 }
 
 app.whenReady().then(() => {
@@ -190,9 +237,18 @@ app.whenReady().then(() => {
   })
 })
 
-app.on('window-all-closed', () => {
-  stopServer()
+// With the tray keeping the app resident, closing all windows should NOT quit
+// the app — it stays in the tray with its service running (unless we are
+// actually quitting). The service is stopped via the tray's "stop/quit".
+app.on('window-all-closed', (event) => {
+  if (!isQuitting) {
+    // Keep running in the tray; stop waiting for the user to quit explicitly.
+    return
+  }
   app.quit()
 })
 
-app.on('before-quit', () => stopServer())
+app.on('before-quit', () => {
+  isQuitting = true
+  stopServer()
+})
