@@ -13,7 +13,7 @@ import { StopServiceRow } from './StopServiceRow.tsx'
 export type { StopServiceRowProps } from './StopServiceRow.tsx'
 
 /** Required services (cordis fiber inject). */
-export const inject = ['slots', 'settings']
+export const inject = ['slots']
 
 /**
  * Client plugin body: register the desktop stop row under General settings.
