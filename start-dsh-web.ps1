@@ -1,10 +1,10 @@
 # start-dsh-web.ps1
-# DeepSeek Harness Web launcher.
+# DeepSeek Harness — open the same local service in the browser.
 #
-# Starts the local `dsh web` server (default http://127.0.0.1:3080), waits
-# until it responds, then opens the browser. Re-uses a running instance and,
-# when 3080 is taken by another program, falls back to an OS-assigned port
-# and opens that URL instead.
+# Opens http://127.0.0.1:5180 in the default browser. 5180 is the SAME backend
+# that the desktop app window uses, so browser and app stay fully in sync.
+# If the desktop app / service is already up it is reused; otherwise a fresh
+# dsh web instance is started here first.
 #
 # Usage:
 #   powershell -ExecutionPolicy Bypass -File start-dsh-web.ps1
@@ -14,7 +14,9 @@ $ErrorActionPreference = 'Stop'
 $Root = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location -LiteralPath $Root
 
-$HostPort = 3080
+# Dedicated port — the SAME service the desktop shell uses, so browser access
+# talks to the identical backend as the app window (multi-client sync).
+$HostPort = 5180
 $Url      = "http://127.0.0.1:$HostPort"
 $LogDir   = Join-Path $Root 'logs'
 $LogFile  = Join-Path $LogDir 'dsh-web.log'
@@ -46,7 +48,7 @@ function Test-Alive {
     }
 }
 
-# Already running on 3080? Just reveal it.
+# Already serving on the shared port? Reveal it in the browser directly.
 if (Test-Alive $Url) {
     Write-Host "[dsh-web] Server already running at $Url"
     Start-Process $Url
@@ -54,7 +56,7 @@ if (Test-Alive $Url) {
 }
 
 $port = $HostPort
-# If 3080 is listening (but not answering), switch to an OS-assigned port.
+# If 5180 is listening but not answering, switch to an OS-assigned port.
 $listener = Get-NetTCPConnection -LocalPort $HostPort -State Listen -ErrorAction SilentlyContinue
 if ($listener) {
     Write-Host "[dsh-web] Port $HostPort is busy (PID $($listener[0].OwningProcess)); using an OS-assigned port."
