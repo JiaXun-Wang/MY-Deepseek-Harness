@@ -1,0 +1,14 @@
+# dsh-lark-link-plus bundle patch — enhanced bridge (adds /sessions GUI-history
+# listing and /open <id> session resume). Install via `dsh plugin add dsh-lark-link-plus`.
+- insert:
+    - id: lark-link-plus
+      name: 'dsh-lark-link-plus'
+      config:
+        enabled: !!js "process.env.DSH_LARK_LINK_ENABLED ?? 'true'"
+        # Feishu app credentials. Prefer the one-click `/lark setup` flow
+        # (QR registerApp); manual entry writes to ctx.credentials.
+        appId: !!js "process.env.DSH_LARK_LINK_APP_ID ?? ''"
+        # groupPolicy: open | mention | keywords | reply
+        groupPolicy: !!js "process.env.DSH_LARK_LINK_GROUP_POLICY ?? 'mention'"
+        # denyList: exact command prefixes denied outright (no prompt, no card).
+        denyList: []
