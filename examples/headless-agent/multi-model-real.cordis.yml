@@ -1,0 +1,45 @@
+# Real-model multi-model orchestration demo (requires DEEPSEEK_API_KEY).
+# A `deepseek-v4-pro` main agent decides the task split and dispatches sub-tasks
+# through ONE `subagent` tool whose `modelChoices` let it pick the executor model
+# per call (cheap/fast = deepseek-v4-flash, deep reasoning = deepseek-v4-pro).
+# This is the "main model gives out tasks to other models, choosing the model at
+# call time" flow — and because `tool-subagent` is a shared capability seam, any
+# session that mounts this composition gets the same per-call model routing.
+- id: base
+  name: '@deepseek-ai/cordis-plugin-include'
+  config:
+    path: cordis.yml
+    patches:
+      - id: agent-spine
+        name: '@deepseek-ai/dsh-agent-spine-demo'
+        config:
+          agents:
+            - id: main
+              provider: deepseek-official
+              # The orchestrator: plans and decides which child model to dispatch to.
+              model: deepseek-v4-pro
+              cwd: !!js process.cwd()
+          workspaceContext:
+            # Keep the AGENTS.md/CLAUDE.md workspace context that guides an orchestrator.
+            maxBytes: 65536
+          persona: |
+            You are a multi-model orchestrator. Break the user's task into
+            independent pieces. Use the `subagent` tool and choose its `model`
+            per sub-task: `deepseek-v4-flash` for cheap, quick sub-tasks and
+            `deepseek-v4-pro` for deep reasoning sub-tasks. Wait for each child,
+            fold its result into your answer, and report a brief combined summary.
+      # One tool instance, dynamic executor: the calling model chooses pro or
+      # flash per call through the tool's `model` parameter (modelChoices).
+      - id: tool-subagent
+        name: '@deepseek-ai/dsh-tool-subagent'
+        config:
+          provider: spawn
+          toolName: subagent
+          agentOptions:
+            # Both choosable models live under the same DeepSeek provider.
+            provider: deepseek-official
+          modelChoices:
+            - deepseek-v4-pro
+            - deepseek-v4-flash
+          backgroundMode: one-shot
+          maxDepth: 2

@@ -51,6 +51,19 @@ export interface Config {
    */
   agentOptions?: AgentOptions
   /**
+   * Model-facing per-call model selection. When set, the tool schema exposes an
+   * optional `model` parameter (an enum of these values) so the calling model
+   * can choose the child's executor model at call time. The chosen value is
+   * merged into the call's `agentOptions.model`, overriding the config-time
+   * `agentOptions.model` for that call. Each value must be a model id the load
+   * routes to a registered adapter. Omission keeps today's behavior: no `model`
+   * parameter, executor bound at config time. In-process spawn/fork providers
+   * treat `agentOptions` values as overrides of inherited parent options; a
+   * remote provider owns its own child budget, so honoring a per-call model is
+   * that provider's responsibility.
+   */
+  modelChoices?: string[]
+  /**
    * Per-child persona that shadows `deployment:persona`. Requires the
    * provider's `persona` capability; omission preserves the deployment persona.
    */
@@ -89,6 +102,8 @@ export const Config: z<Config> = z.object({
     model: z.string(),
     maxTokens: z.number().step(1).min(1).max(Number.MAX_SAFE_INTEGER),
   }).default(undefined as unknown as { provider: string; model: string; maxTokens: number }),
+  // Preserve omission; Schemastery's `[]` default would expose the param on every instance.
+  modelChoices: z.array(z.string()).default(undefined as unknown as string[]),
   persona: z.string(),
   // Preserve omission; Schemastery's `{ allow: [] }` default would deny every tool.
   toolFilter: z.object({
@@ -264,6 +279,36 @@ function resolveDelegationRun(
   }
 }
 
+/**
+ * Resolve the child `agentOptions` for one delegation, folding a per-call model
+ * choice over the config-time options. An absent choice returns the configured
+ * options unchanged (possibly undefined); a supplied choice overrides only
+ * `model`, preserving the other configured fields.
+ * @param config - the loaded tool config, whose `agentOptions` carry the defaults.
+ * @param modelOverride - the model the caller chose, or undefined when the caller
+ *   deferred to the config-time model.
+ * @returns the request-level agentOptions, or undefined when neither a config
+ *   default nor a caller choice provides one.
+ */
+function resolveAgentOptions(config: Config, modelOverride: string | undefined): AgentOptions | undefined {
+  if (modelOverride === undefined) return config.agentOptions
+  return { ...config.agentOptions, model: modelOverride }
+}
+
+/**
+ * Compose the fail-loud message when a caller names a model the configured
+ * `modelChoices` does not offer (or the instance configured no choices at all).
+ * @param config - the loaded tool config.
+ * @param model - the rejected caller-supplied model id.
+ * @returns a self-contained error statement with the offered enum when present.
+ */
+function modelChoicesUnsetMessage(config: Config, model: string): string {
+  const offered = config.modelChoices === undefined
+    ? ''
+    : `; this instance offers ${config.modelChoices.map(id => `"${id}"`).join(', ')}`
+  return `subagent tool rejected model "${model}": this instance configures no matching ` + `\`modelChoices\` entry${offered}`
+}
+
 export function apply(ctx: Context, config: Config): void {
   // Direct apply() bypasses Schemastery's numeric constraints. A direct-apply
   // omission stays capless (the schema default only runs through the loader).
@@ -271,6 +316,16 @@ export function apply(ctx: Context, config: Config): void {
   // Reject an empty explicit filter at load instead of failing every delegation.
   if (config.toolFilter !== undefined && config.toolFilter.allow === undefined && config.toolFilter.deny === undefined) {
     throw new Error('tool-subagent: `toolFilter` is configured but names neither `allow` nor `deny` — remove the key or fill the filter')
+  }
+  // Reject an empty explicit modelChoices at load: it would expose a model enum
+  // with no selectable member and every delegation would fail validation.
+  if (config.modelChoices !== undefined) {
+    if (config.modelChoices.length === 0) {
+      throw new Error('tool-subagent: `modelChoices` is configured as an empty list — remove the key or name at least one model id')
+    }
+    if (new Set(config.modelChoices).size !== config.modelChoices.length) {
+      throw new Error('tool-subagent: `modelChoices` names a duplicate model id — list each model id once')
+    }
   }
   const backgroundEnabled = config.enableRunInBackground !== false
   const continuable = (config.backgroundMode ?? 'one-shot') === 'continuable'
@@ -321,6 +376,13 @@ export function apply(ctx: Context, config: Config): void {
             description: continuable
               ? 'Whether to run in the background and return a durable subagent id immediately. Defaults to true. Set false to wait for the result when your next action depends on it.'
               : 'Whether to run as a background job and return its id. Defaults to false; collect with job_output or stop with job_kill.',
+          },
+        } : {},
+        ...config.modelChoices !== undefined ? {
+          model: {
+            type: 'string' as const,
+            enum: config.modelChoices,
+            description: 'Choose the model that executes this subtask. Omit to use this tool instance\'s configured child model.',
           },
         } : {},
       },
@@ -374,11 +436,24 @@ export function apply(ctx: Context, config: Config): void {
         }
 
         const maxDepth = typeof config.maxDepth === 'number' ? config.maxDepth : undefined
+        // A configured modelChoices makes `model` a model-visible choice; the
+        // arg validator permits undeclared keys, so validate here. An explicit
+        // model outside the configured enum is a fail-loud delegation error,
+        // never a silent fallback to the config-time model.
+        const modelOverride = args.model
+        if (modelOverride !== undefined) {
+          if (config.modelChoices === undefined || !config.modelChoices.includes(modelOverride)) {
+            throw new Error(
+              modelChoicesUnsetMessage(config, modelOverride),
+            )
+          }
+        }
+        const agentOptions = resolveAgentOptions(config, modelOverride)
         const request = {
           label: args.description,
           prompt: [{ type: 'text', text: args.prompt }] as ContentBlock[],
           parent,
-          ...config.agentOptions !== undefined ? { agentOptions: config.agentOptions } : {},
+          ...agentOptions !== undefined ? { agentOptions } : {},
           ...config.persona !== undefined ? { persona: config.persona } : {},
           ...config.toolFilter !== undefined ? { toolFilter: config.toolFilter } : {},
           ...maxDepth !== undefined ? { maxDepth } : {},

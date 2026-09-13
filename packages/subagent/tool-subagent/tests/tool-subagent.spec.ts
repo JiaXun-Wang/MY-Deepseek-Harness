@@ -1275,3 +1275,113 @@ describe('depth budget configuration', () => {
     expect(requests[0]?.toolFilter).toBeUndefined()
   })
 })
+
+describe('dsh-tool-subagent per-call model selection (modelChoices)', () => {
+  async function modelSetup(toolConfig: { modelChoices?: string[]; agentOptions?: { model?: string } } = {}) {
+    const requests: SubagentStartRequest[] = []
+    const ctx = new Context()
+    await ctx.plugin(SystemPrompt)
+    await ctx.plugin(ToolRuntime)
+    await ctx.plugin(SubagentRuntime)
+    ctx.subagents.registerProvider({
+      name: 'capture-model',
+      capabilities: { outputSchema: false, depthLimit: false, toolFilter: false, persona: false },
+      inheritsParentContext: false,
+      start: async (request) => {
+        requests.push(request)
+        return {
+          id: SessionId(`model-child-${requests.length}`),
+          localAgent: undefined,
+          result: Promise.resolve({ output: [{ type: 'text', text: 'ok' }], stopReason: 'completed' as const }),
+          dispose: async () => {},
+        }
+      },
+    })
+    await ctx.plugin(tool, { provider: 'capture-model', maxDepth: 'provider-managed', ...toolConfig })
+    return { ctx, requests }
+  }
+
+  it('omits the model parameter and unchanged behavior when modelChoices is not configured', async () => {
+    const ctx = await setup({ provider: 'mock' })
+    const schema = ctx.tools.schemas().find(s => s.name === 'subagent')!
+    const props = (schema.parameters as { properties?: Record<string, unknown> }).properties ?? {}
+    expect(props).not.toHaveProperty('model')
+    expect(Object.keys(props).sort()).toEqual(['description', 'prompt', 'run_in_background'])
+  })
+
+  it('exposes an optional model enum parameter when modelChoices is configured', async () => {
+    const ctx = await setup({ provider: 'mock', modelChoices: ['deepseek-v4-pro', 'deepseek-v4-flash'] })
+    const schema = ctx.tools.schemas().find(s => s.name === 'subagent')!
+    const model = (schema.parameters as { properties: Record<string, unknown> }).properties['model']
+    expect(model).toMatchObject({ type: 'string', enum: ['deepseek-v4-pro', 'deepseek-v4-flash'] })
+  })
+
+  it('forwards a chosen model into the start request agentOptions.model', async () => {
+    const { ctx, requests } = await modelSetup({ modelChoices: ['flash', 'pro'] })
+    await callSubagent(ctx, { description: 'd', prompt: 'p', model: 'pro' })
+    expect(requests[0]?.agentOptions).toEqual({ model: 'pro' })
+  })
+
+  it('a call-time choice overrides the config-time agentOptions.model for that call only', async () => {
+    const { ctx, requests } = await modelSetup({
+      modelChoices: ['flash', 'pro'],
+      agentOptions: { model: 'flash' },
+    })
+    // No choice → config-time model preserved.
+    await callSubagent(ctx, { description: 'defaults', prompt: 'p' })
+    expect(requests[0]?.agentOptions).toEqual({ model: 'flash' })
+    // Choice → overrides config-time model for this call.
+    await callSubagent(ctx, { description: 'choice', prompt: 'p', model: 'pro' })
+    expect(requests[1]?.agentOptions).toEqual({ model: 'pro' })
+  })
+
+  it('rejects a model outside the configured enum (fail loud, not silent fallback)', async () => {
+    const { ctx, requests } = await modelSetup({ modelChoices: ['flash', 'pro'] })
+    const result = await callSubagent(ctx, { description: 'd', prompt: 'p', model: 'claude' })
+    expect(result.isError).toBe(true)
+    // The arg validator enforces the enum before execution: the invalid choice is
+    // a loud rejection, never a silent fallback to the config-time model.
+    expect(text(result)).toContain('"model" must be one of ["flash","pro"]')
+    // No child was started.
+    expect(requests).toHaveLength(0)
+  })
+
+  it('rejects a model choice when modelChoices is not configured', async () => {
+    const { ctx } = await modelSetup()
+    // Schema omits `model`, but the arg validator allows undeclared keys, so
+    // the execution-time guard must also reject a stray model argument.
+    const result = await callSubagent(ctx, { description: 'd', prompt: 'p', model: 'anything' })
+    expect(result.isError).toBe(true)
+    expect(text(result)).toContain('configures no matching `modelChoices` entry')
+  })
+
+  it('fails load on an empty modelChoices list', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SystemPrompt)
+    await ctx.plugin(ToolRuntime)
+    await ctx.plugin(SubagentRuntime)
+    ctx.subagents.registerProvider({
+      name: 'p',
+      capabilities: { outputSchema: false, depthLimit: false, toolFilter: false, persona: false },
+      inheritsParentContext: false,
+      start: () => { throw new Error('unreachable') },
+    })
+    await expect(ctx.plugin(tool, { provider: 'p', modelChoices: [] }))
+      .rejects.toThrow(/modelChoices.* empty list/)
+  })
+
+  it('fails load on a duplicate modelChoices entry', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SystemPrompt)
+    await ctx.plugin(ToolRuntime)
+    await ctx.plugin(SubagentRuntime)
+    ctx.subagents.registerProvider({
+      name: 'p',
+      capabilities: { outputSchema: false, depthLimit: false, toolFilter: false, persona: false },
+      inheritsParentContext: false,
+      start: () => { throw new Error('unreachable') },
+    })
+    await expect(ctx.plugin(tool, { provider: 'p', modelChoices: ['a', 'a'] }))
+      .rejects.toThrow(/duplicate model id/)
+  })
+})

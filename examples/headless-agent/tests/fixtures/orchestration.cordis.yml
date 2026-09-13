@@ -1,0 +1,52 @@
+# Keyless multi-model orchestration demo: no API key required. A mock "main
+# model" emits one `subagent` delegation whose spawned child runs on a distinct
+# mock adapter ("another model") and reports back. Swap `orchestration-main`/
+# `orchestration-child` providers for real DeepSeek models in cordis.yml.
+- id: orchestration-mock-llm
+  name: './orchestration-mock-llm.ts'
+
+- id: base
+  name: '@deepseek-ai/cordis-plugin-include'
+  config:
+    path: ../../cordis.yml
+    patches:
+      - id: llm-deepseek
+        name: '@deepseek-ai/dsh-llm-deepseek'
+        disabled: true
+      - id: agent-spine
+        name: '@deepseek-ai/dsh-agent-spine-demo'
+        config:
+          agents:
+            - id: main
+              provider: orchestration-main
+              model: orchestration-main
+              cwd: !!js process.cwd()
+          workspaceContext: false
+          dshHome: './.dsh-home'
+          skills:
+            filesystem:
+              agentsHome: './.agents-home'
+          persona: 'Keyless multi-model orchestration demo.'
+      - id: tool-subagent
+        name: '@deepseek-ai/dsh-tool-subagent'
+        config:
+          provider: spawn
+          toolName: subagent
+          # The child "model" is a distinct adapter; pin the provider that routes
+          # to it, and let the calling model choose which model id executes.
+          agentOptions:
+            provider: orchestration-child
+          modelChoices:
+            - orchestration-child
+          backgroundMode: one-shot
+          enableRunInBackground: false
+          maxDepth: 1
+      - id: tool-ralph
+        name: '@deepseek-ai/dsh-tool-ralph'
+        disabled: true
+      - id: workflow-worker-thread
+        name: '@deepseek-ai/dsh-workflow-worker-thread'
+        disabled: true
+      - id: tool-workflow
+        name: '@deepseek-ai/dsh-tool-workflow'
+        disabled: true
