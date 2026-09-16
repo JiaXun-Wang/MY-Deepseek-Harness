@@ -24,6 +24,18 @@ const DEFAULT_PORT = 5180
 const CLI_CLIENT = join(ROOT, 'apps', 'cli', 'lib', 'bin.js')
 const NODE = process.env.NODE || (process.platform === 'win32' ? 'node' : 'node')
 
+// Autostart facts this shell has to encode itself: Windows stores the login
+// item as one literal command line (so the app directory must be passed as an
+// argument, or login would launch a bare Electron), and Electron's
+// `wasOpenedAtLogin` is macOS-only. This app therefore registers a background
+// flag and recognizes its own login launch from argv.
+const BACKGROUND_FLAG = '--background'
+const LOGIN_ITEM_OPTIONS = { path: process.execPath, args: [__dirname, BACKGROUND_FLAG] }
+
+function openedInBackground() {
+  return process.argv.includes(BACKGROUND_FLAG)
+}
+
 function nodeCommand() {
   // Resolve an absolute node path so the shell always launches the same runtime
   // found on PATH at startup.
@@ -217,9 +229,9 @@ function buildTray() {
     {
       label: '开机自启（后台预热服务）',
       type: 'checkbox',
-      checked: app.getLoginItemSettings().openAtLogin,
+      checked: app.getLoginItemSettings(LOGIN_ITEM_OPTIONS).openAtLogin,
       click: (item) => {
-        app.setLoginItemSettings({ openAtLogin: item.checked })
+        app.setLoginItemSettings({ openAtLogin: item.checked, ...LOGIN_ITEM_OPTIONS })
       },
     },
     { type: 'separator' },
@@ -249,7 +261,7 @@ function TrayIcon() {
 async function main() {
   const port = Number(process.env.DSH_DESKTOP_PORT) || DEFAULT_PORT
   const appUrl = `http://127.0.0.1:${port}`
-  const atLogin = app.getLoginItemSettings().wasOpenedAtLogin
+  const atLogin = openedInBackground() || app.getLoginItemSettings().wasOpenedAtLogin
 
   if (atLogin) {
     // Autostart: warm the service silently into the tray, no window.

@@ -1,0 +1,17 @@
+# dsh-feishu-bridge bundle patch — inserts the bridge plugin row into the
+# composition. Install with `dsh plugin --profile web add <path-to-this-package>`.
+#
+# The values are literals on purpose: this plugin reads its own environment
+# overrides (`DSH_FEISHU_BRIDGE_ENABLED`, `DSH_FEISHU_CREDENTIAL_REF`), so the
+# row never depends on loader expression evaluation.
+#
+# Only ONE plugin may hold the Feishu long connection for one app, so remove any
+# other Feishu bridge from the same profile before enabling this one.
+- insert:
+    - id: feishu-bridge
+      name: 'dsh-feishu-bridge'
+      config:
+        enabled: true
+        # Credential reference resolved through ctx.credentials; the stored value
+        # is the JSON written by the app-setup flow: {appId, appSecret, domain}.
+        credentialRef: 'LARK_LINK_APP'
