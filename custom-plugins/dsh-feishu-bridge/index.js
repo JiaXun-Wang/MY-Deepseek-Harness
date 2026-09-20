@@ -78,6 +78,21 @@ function textOf(blocks) {
 }
 
 /**
+ * Read one session's metadata out of `sessionPersistence.list()`.
+ *
+ * The list row changed shape upstream: current builds return `SessionHeader`
+ * rows directly, newer builds return `SessionPersistenceSnapshot` rows carrying
+ * the same header under `.header`. Normalizing here keeps `/sessions` and
+ * `/open` working across that change instead of silently listing nothing.
+ *
+ * @param row - one element of the `list()` result.
+ * @returns the session header fields this bridge reads.
+ */
+function sessionHeaderOf(row) {
+  return row?.header ?? row
+}
+
+/**
  * Whether a reply is worth rendering as a markdown card rather than plain text.
  * @param text - the committed assistant text.
  * @returns true when the text carries block-level markdown.
@@ -333,7 +348,8 @@ export function apply(ctx, config) {
       return { error: `列出会话失败：${err instanceof Error ? err.message : String(err)}` }
     }
     const rows = headers
-      .filter((h) => h.origin !== 'subagent' && !h.parentSession)
+      .map(sessionHeaderOf)
+      .filter((h) => h?.id && h.origin !== 'subagent' && !h.parentSession)
       .sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0))
     const lines = []
     for (const h of rows.slice(0, 30)) {
@@ -415,7 +431,7 @@ export function apply(ctx, config) {
       const persistence = ctx.get('sessionPersistence')
       let meta
       try {
-        meta = (await persistence?.list?.() ?? []).find((h) => h.id === arg)
+        meta = (await persistence?.list?.() ?? []).map(sessionHeaderOf).find((h) => h?.id === arg)
       } catch {
         meta = undefined
       }
